@@ -272,7 +272,7 @@ func PrintServers(message string, Servers []*Redis) {
 	r, _ := json.MarshalIndent(Servers, "", "  ")
 	result += string(r)
 	result += fmt.Sprintf("*****************\n")
-	log.Info(result)
+	log.V(2).Info(result)
 }
 
 func main() {
