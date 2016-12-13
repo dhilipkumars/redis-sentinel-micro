@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"strings"
 	"testing"
 )
@@ -92,4 +93,118 @@ func TestParseResponseValid(t *testing.T) {
 
 	t.Logf("R=%v", R)
 
+}
+
+func TestFindNxtMaster_Valid(t *testing.T) {
+
+	var Slaves []*Redis
+	var maxSyncbytes int64
+
+	for i := 0; i < 3; i++ {
+		var r Redis
+		r.MasterHost = "127.0.0.1"
+		r.MasterPort = "6313"
+		r.Priority = 100
+		r.SyncBytes = int64(1000 + i)
+		r.EndPoint = fmt.Sprint("127.0.0.1:%d", 6314+i)
+		Slaves = append(Slaves, &r)
+		maxSyncbytes = r.SyncBytes //Record max sync bytes clearly the last slave will have max syncbytes
+	}
+	//It should have selected the slaves with Maximum sync bytes
+	NewMaster := FindNxtMaster(Slaves)
+
+	//New master cannot be nil, it should have selected a valid master
+	if NewMaster == nil {
+		t.Errorf("NewMaster cannot be NIL\n")
+		t.Fail()
+	}
+
+	//if selected slave is not of maxsync bytes then fail
+	if NewMaster.SyncBytes != maxSyncbytes {
+		t.Errorf("Selected master is not maxSync bytes NewMaster=%v MaxSyncBytes=%v\n", NewMaster.SyncBytes, maxSyncbytes)
+		t.Fail()
+	}
+}
+
+func TestFindNxtMaster_NilInput(t *testing.T) {
+
+	var Slaves []*Redis
+	NewMaster := FindNxtMaster(Slaves)
+
+	if NewMaster != nil {
+		t.Fail()
+	}
+}
+
+func TestFindNxtMaster_WithMaster(t *testing.T) {
+
+	var Slaves []*Redis
+
+	for i := 0; i < 3; i++ {
+		var r Redis
+		r.MasterHost = "127.0.0.1"
+		r.MasterPort = "6313"
+		r.Priority = 100
+		r.SyncBytes = int64(1000 - i)
+		r.EndPoint = fmt.Sprint("127.0.0.1:%d", 6314+i)
+		r.MasterHost = "127.0.0.1"
+		r.MasterPort = "6319"
+		r.Role = REDIS_ROLE_SLAVE
+		Slaves = append(Slaves, &r)
+	}
+
+	var master Redis
+	master.EndPoint = "127.0.0.1:6319"
+	master.SyncBytes = 1001
+	master.Role = REDIS_ROLE_MASTER
+	Slaves = append(Slaves, &master)
+
+	NewMaster := FindNxtMaster(Slaves)
+
+	//Should have detected that there is a valid master and should not select a new master
+	if NewMaster != nil {
+		t.Fail()
+	}
+
+}
+
+func TestFindNxtMaster_WithMisconfiguredMaster(t *testing.T) {
+
+	var Slaves []*Redis
+
+	for i := 0; i < 3; i++ {
+		var r Redis
+		r.MasterHost = "127.0.0.1"
+		r.MasterPort = "6313"
+		r.Priority = 100
+		r.SyncBytes = int64(1000 - i)
+		r.EndPoint = fmt.Sprint("127.0.0.1:%d", 6314+i)
+		r.MasterHost = "127.0.0.1"
+		r.MasterPort = "6319"
+		r.Role = REDIS_ROLE_SLAVE
+		Slaves = append(Slaves, &r)
+	}
+
+	var m1, m2 Redis
+	m1.EndPoint = "127.0.0.1:6319"
+	m1.SyncBytes = 1001
+	m1.Role = REDIS_ROLE_MASTER
+	Slaves = append(Slaves, &m1)
+
+	m2.EndPoint = "127.0.0.1:6316"
+	m2.SyncBytes = 1100
+	m2.Role = REDIS_ROLE_MASTER
+	Slaves = append(Slaves, &m2)
+
+	NewMaster := FindNxtMaster(Slaves)
+
+	//Cannot be nill
+	if NewMaster == nil {
+		t.Errorf("NewMaster cannot be nil")
+		t.Fail()
+	}
+	if NewMaster.SyncBytes != 1100 {
+		t.Errorf("NewMaster SyncBytes Exp=1100 Obtained=%d", NewMaster.SyncBytes)
+		t.Fail()
+	}
 }
