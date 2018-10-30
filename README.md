@@ -39,7 +39,7 @@ slave3:ip=172.31.10.90,port=6383,state=online,offset=197,lag=1
 slave4:ip=172.31.10.90,port=6382,state=online,offset=197,lag=1
 master_repl_offset:197
 ```
-The master crashes mid-way leaving all the 5 slaves in an inconstant stage like below
+The master crashes mid-way leaving all the 5 slaves in an inconsistent stage like below
 ```
 slave_repl_offset:98187702
 slave_repl_offset:98187702
@@ -47,7 +47,7 @@ slave_repl_offset:98150330
 slave_repl_offset:98134252
 slave_repl_offset:98134252
 ```
-All the above slaves have equal priority, but we have 3 replication value `98134252`, `98150330` and `98187702`. Ideally the slave with heighst replication value should be promoted. 
+All the above slaves have equal priority, but we have 3 replication values `98134252`, `98150330` and `98187702`. Ideally the slave with highest replication value should be promoted. 
 When you run `redis-sentinel-micro` like this it automatically detects the next master and re-configures all the slaves to point to this new master
 ```
 $./redis-sentinel-micro -logtostderr 0.0.0.0:6382 0.0.0.0:6383 0.0.0.0:6384 0.0.0.0:6385 0.0.0.0:6386        
@@ -109,4 +109,21 @@ I1213 19:29:12.037534   16369 redis_sentinel_micro.go:205] RSMaster_EP=0.0.0.0:6
 I1213 19:29:12.037558   16369 redis_sentinel_micro.go:205] RSMaster_EP=0.0.0.0:6382 available MasterEP=0.0.0.0:6382
 W1213 19:29:12.037581   16369 redis_sentinel_micro.go:220] The redis master is already configured, dont do anything SyncBytes=771 availableMasterHits=4 len(Slaves)=4
 E1213 19:29:12.037606   16369 redis_sentinel_micro.go:300] Redis Instance does'nt need a Slave Promotion
+```
+
+## Building docker images
+> All building can happen in docker to keep from requiring build dependencies on local machine.
+
+### Sentinel
+To build a new image for the `sentinel` binary, run the following command:
+
+```
+docker build -t dhilipkumars/redis-sentinel-k8s:0.2.0 ./
+```
+
+### Make Slave
+To build a new image for the `make_slave` binary, run the following command:
+
+```
+docker build -t dhilipkumars/mk-redis-slave:0.2.0 -f mk_redis_slave/Dockerfile ./mk_redis_slave
 ```
