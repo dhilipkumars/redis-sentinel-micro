@@ -27,9 +27,10 @@ import (
 	"sync"
 
 	"encoding/json"
+	"time"
+
 	log "github.com/golang/glog"
 	"github.com/mediocregopher/radix.v2/redis"
-	"time"
 )
 
 //Constants to be used in the program
@@ -124,7 +125,7 @@ func (R *Redis) ParseResponse(Res string) bool {
 					R.MasterDownSince = i
 				}
 			case "master_link_status":
-				if kv[1] == "on" {
+				if kv[1] == "on" || kv[1] == "up" {
 					R.MasterLinkStatus = true
 				} else {
 					R.MasterLinkStatus = false
@@ -142,7 +143,7 @@ func (R *Redis) ParseResponse(Res string) bool {
 			}
 		}
 	}
-	fmt.Printf("R=%v\n", R)
+	fmt.Printf("R=%+v\n", R)
 	return true
 }
 
@@ -174,7 +175,7 @@ func CollectStats(EndPoint string) (*Redis, error) {
 	}
 	Res := C.Cmd("INFO", "REPLICATION")
 
-	//log.Infof("CollectStats(%s)=%v", EndPoint, Res.String())
+	log.Infof("CollectStats(%s)=%v", EndPoint, Res.String())
 	R.ParseResponse(Res.String())
 
 	R.EndPoint = EndPoint
@@ -342,7 +343,6 @@ func PrintServers(message string, Servers []*Redis) {
 }
 
 func main() {
-
 	svc := flag.String("service", "cache", "Provide the redis statefulset's service name")
 	flag.Set("logtostderr", "true")
 	flag.Parse()
@@ -379,12 +379,19 @@ func main() {
 
 	//Does it really need a master
 	OldMaster, NewMaster := FindNxtMaster(Servers)
-	log.Infof("OldMaster=%v NewMaster=%v", OldMaster, NewMaster)
+	log.Infof("OldMaster=%+v NewMaster=%+v", OldMaster, NewMaster)
 
 	if NewMaster == nil && OldMaster != nil {
 
-		log.Errorf("Redis Instance does'nt need a Slave Promotion")
+		log.Errorf("Redis Instance doesn't need a Slave Promotion")
 		NewMaster = OldMaster
+
+		// When master is found, Endpoint is set but host and port are not
+		NewMaster.MasterHost, NewMaster.MasterPort, err = net.SplitHostPort(NewMaster.EndPoint)
+		if err != nil {
+			log.Infof("Error getting host and port from host (%s): err :%v", NewMaster.Endpoint, err)
+			os.Exit(1)
+		}
 
 	} else if OldMaster == nil && NewMaster != nil {
 
@@ -412,12 +419,15 @@ func main() {
 		os.Exit(1)
 	}
 	defer f.Close()
-	_, err = f.WriteString(NewMaster.MasterHost + " " + NewMaster.MasterPort)
+
+	log.Infof("OldMaster=%+v NewMaster=%+v", OldMaster, NewMaster)
+
+	_, err = f.WriteString(fmt.Sprintf("%v %v", NewMaster.MasterHost, NewMaster.MasterPort))
 	if err != nil {
 		log.Errorf("Error writing to the config file err:%v", err)
-
 		os.Exit(1)
 	}
+
 	log.Infof("Redis-Sentinal-micro Finished")
 
 }
