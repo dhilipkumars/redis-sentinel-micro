@@ -389,7 +389,7 @@ func main() {
 		// When master is found, Endpoint is set but host and port are not
 		NewMaster.MasterHost, NewMaster.MasterPort, err = net.SplitHostPort(NewMaster.EndPoint)
 		if err != nil {
-			log.Infof("Error getting host and port from host (%s): err :%v", NewMaster.Endpoint, err)
+			log.Infof("Error getting host and port from host (%s): err :%v", NewMaster.EndPoint, err)
 			os.Exit(1)
 		}
 
